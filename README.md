@@ -41,18 +41,17 @@ model_results = ClassModelResults()
 
 
 ```python
-dir_results_files = 'results_files'
-dir_models = 'models'
+dir_results_files = 'results_files' #Default path
+dir_models = 'models' #Default path
 ```
 
 
 ```python
 df_results = model_results.get_model_results(dir_results_files)
-len(df_results)
 ```
 
 
-### Get metrics
+### Get metrics from all the stored models
 
 ```python
 df_results["metrics"]
