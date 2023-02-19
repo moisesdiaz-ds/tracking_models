@@ -28,7 +28,7 @@ NOTE: you can also specify that you only want to load the n last results, using 
 Try it yourself and test it using the Tracking model results - Test notebook.ipynb
 
 
-# Ejemplo
+# Example
 
 ### Initiate object model results
 
