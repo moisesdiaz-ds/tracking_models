@@ -25,4 +25,4 @@ This class loads all the resutls from saved from the save_model function and sum
 NOTE: you can also specify that you only want to load the n last results, using `ClassModelResults(last_results=n)`
 
 # Try it yourself
-Try it yourself and test it using the Tracking model results - Test notebook
+Try it yourself and test it using the Tracking model results - Test notebook.ipynb
