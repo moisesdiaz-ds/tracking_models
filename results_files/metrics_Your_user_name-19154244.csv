@@ -1,2 +1,0 @@
-Model,Tipo_metrica,Tipo_modelo,Algoritmo,umbral,AUC,Gini,F1_score,Accuracy,Recall,Precision,Fecha,Comentario
-Your_user_name-19154244,Clasificacion,1,RandomForestClassifier,0.5,0.9612517006802722,0.9225034013605444,0.7546634653861545,0.9544267053701017,0.6959183673469387,0.9137162557330625,2023-02-19 15:42:00,
