@@ -2,15 +2,28 @@ import os
 import pickle
 import datetime
 import warnings
-
+# from time import sleep
+import s3fs
 import numpy as np
 import pandas as pd
-
+# import numpy as np
+# import matplotlib.pyplot as plt
+# from sklearn import svm
+# from joblib import dump, load
+# from sklearn.utils import shuffle
+# from sklearn.naive_bayes import MultinomialNB
+# from sklearn.ensemble import RandomForestClassifier
+# from sklearn.model_selection import (
+#     train_test_split,
+#     cross_validate,
+# )
 from sklearn.metrics import (
     accuracy_score,
     recall_score,
     precision_score,
     f1_score,
+    # cohen_kappa_score,
+    # confusion_matrix,
     mean_squared_error,
     explained_variance_score,
     r2_score,
@@ -49,7 +62,7 @@ def save_model(
         metrics_extras = dict()
     if stats_extras is None:
         stats_extras = dict()
-
+    fs = s3fs.S3FileSystem()
     today = (
         str(datetime.datetime.now().day)
         + "-"
@@ -176,7 +189,7 @@ def save_model(
             + model_id
             + ".pkl"
         )
-        with open(target_enc_model_dir, "wb") as file:
+        with fs.open(target_enc_model_dir, "wb") as file:
             pickle.dump(target_enc_model, file)
     if dicc_models_predict_nans:
         dicc_models_predict_nans_dir = (
@@ -186,7 +199,7 @@ def save_model(
             + model_id
             + ".pkl"
         )
-        with open(dicc_models_predict_nans_dir, "wb") as file:
+        with fs.open(dicc_models_predict_nans_dir, "wb") as file:
             pickle.dump(dicc_models_predict_nans, file)
     if feature_validation_dict:
         feature_validation_dict_dir = (
@@ -196,7 +209,7 @@ def save_model(
             + model_id
             + ".pkl"
         )
-        with open(feature_validation_dict_dir, "wb") as file:
+        with fs.open(feature_validation_dict_dir, "wb") as file:
             pickle.dump(feature_validation_dict, file)
     if save:
         # Guardamos el modelo en la carpeta de models
@@ -223,9 +236,9 @@ def save_model(
             index_label="Model",
         )
         df_feats.to_csv(
-            f"{dir_results_files}/features_train_cols_{user_name}-{model_id}.csv",
-            index_label="Model",)
-
+            f"{dir_results_files}/features_train_{user_name}-{model_id}.csv",
+            index_label="Model",
+        )
         df_feats_train_mean.to_csv(
             f"{dir_results_files}/features_train_mean_"
             + f"{user_name}-{model_id}.csv",
@@ -234,15 +247,24 @@ def save_model(
         print("Modelo, parametros, metricas y stats guardados exitosamente")
 class ClassModelResults:
     def __init__(self, last_results=0, df_results=None):
+        fs = s3fs.S3FileSystem()
+        self.fs = fs
         self.last_results = last_results
         self.df_results = {}
         self.df_results["params"] = pd.DataFrame()
         self.df_results["metrics"] = pd.DataFrame()
         self.df_results["stats"] = pd.DataFrame()
-        self.df_results["features_train_cols"] = pd.DataFrame()
+        self.df_results["features_train"] = pd.DataFrame()
         self.df_results["features_train_mean"] = pd.DataFrame()
     def get_model_results(self, dir_results_files="results_files",only_last_files=0):
-        tipo_file = ["params","metrics","stats","features_train_cols","features_train_mean"]
+        fs = s3fs.S3FileSystem()
+        tipo_file = [
+            "params",
+            "metrics",
+            "stats",
+            "features_train",
+            "features_train_mean",
+        ]
         df_results = {}
         for t in tipo_file:
             if dir_results_files.startswith("s3"):
@@ -306,8 +328,16 @@ class ClassModelResults:
                 str(df_results[key]["Model"].iloc[-1]).split("-")[-1]
             )
         return self.df_results
-
-
+    def load_model(self, model_id, dir_models="models"):
+        if dir_models.startswith("s3"):
+            with self.fs.open(
+                f"{dir_models}/model_{model_id}.pkl", "rb"
+            ) as input_file:
+                model_loaded = pickle.load(input_file)
+        else:
+            with open(f"{dir_models}/model_{model_id}.pkl", "rb") as input_file:
+                model_loaded = pickle.load(input_file)
+        return model_loaded
     def load_best_model(
         self,
         metrica="F1_score",
@@ -329,42 +359,43 @@ class ClassModelResults:
         best_model_idx = df_metrics[metrica].idxmax()
         best_model_name = df_metrics.loc[best_model_idx].name
         # print(best_model_name)
-        best_model = load_model(best_model_name, dir_models)
+        best_model = self.load_model(best_model_name, dir_models)
         return best_model
-
-def file_exists_custom(path_to_file):
+def file_exists_s3(path_to_file):
+    fs = s3fs.S3FileSystem()
     try:
-        open(path_to_file)
+        fs.open(path_to_file)
         return True
     except BaseException:
         return False
-
 def load_model(chosen_model_name, dir_models):
+    fs = s3fs.S3FileSystem()
     dict_results = {}
     # dicc_predict_nans
     path_to_file = f"{dir_models}/dicc_predict_nans_{chosen_model_name}.pkl"
-    if file_exists_custom(path_to_file):
-        with open(path_to_file, "rb") as input_file:
+    if file_exists_s3(path_to_file):
+        with fs.open(path_to_file, "rb") as input_file:
             dicc_predict_nans = pickle.load(input_file)
         dict_results["dicc_predict_nans"] = dicc_predict_nans
     # target_enc_model
     path_to_file = f"{dir_models}/target_enc_model_{chosen_model_name}.pkl"
-    if file_exists_custom(path_to_file):
-        with open(path_to_file, "rb") as input_file:
+    if file_exists_s3(path_to_file):
+        with fs.open(path_to_file, "rb") as input_file:
             target_enc_model = pickle.load(input_file)
         dict_results["target_enc_model"] = target_enc_model
     # chosen_model
-    with open(
+    with fs.open(
         f"{dir_models}/model_{chosen_model_name}.pkl", "rb"
     ) as input_file:
         chosen_model = pickle.load(input_file)
     dict_results["chosen_model"] = chosen_model
     return dict_results
 def export_model(chosen_model_name, dir_models,dir_export):
+    fs = s3fs.S3FileSystem()
     dict_results = {}
     # dicc_predict_nans
     path_to_file = f"{dir_models}/dicc_predict_nans_{chosen_model_name}.pkl"
-    filehandler = open(path_to_file, "rb")
+    filehandler = fs.open(path_to_file, "rb")
     file_obj = pickle.load(filehandler)
     filename = path_to_file.split('/')[-1]
     dir_export_file = dir_export+f'/{filename}'
@@ -372,7 +403,7 @@ def export_model(chosen_model_name, dir_models,dir_export):
     pickle.dump(file_obj,filehandler2)
     # target_enc_model_
     path_to_file = f"{dir_models}/target_enc_model_{chosen_model_name}.pkl"
-    filehandler = open(path_to_file, "rb")
+    filehandler = fs.open(path_to_file, "rb")
     file_obj = pickle.load(filehandler)
     filename = path_to_file.split('/')[-1]
     dir_export_file = dir_export+f'/{filename}'
@@ -380,7 +411,7 @@ def export_model(chosen_model_name, dir_models,dir_export):
     pickle.dump(file_obj,filehandler2)
     # model_
     path_to_file = f"{dir_models}/model_{chosen_model_name}.pkl"
-    filehandler = open(path_to_file, "rb")
+    filehandler = fs.open(path_to_file, "rb")
     file_obj = pickle.load(filehandler)
     filename = path_to_file.split('/')[-1]
     dir_export_file = dir_export+f'/{filename}'
