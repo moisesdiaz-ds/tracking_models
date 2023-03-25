@@ -2,34 +2,22 @@ import os
 import pickle
 import datetime
 import warnings
-# from time import sleep
-import s3fs
+
 import numpy as np
 import pandas as pd
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from sklearn import svm
-# from joblib import dump, load
-# from sklearn.utils import shuffle
-# from sklearn.naive_bayes import MultinomialNB
-# from sklearn.ensemble import RandomForestClassifier
-# from sklearn.model_selection import (
-#     train_test_split,
-#     cross_validate,
-# )
+
 from sklearn.metrics import (
     accuracy_score,
     recall_score,
     precision_score,
     f1_score,
-    # cohen_kappa_score,
-    # confusion_matrix,
     mean_squared_error,
     explained_variance_score,
     r2_score,
     roc_auc_score,
-    average_precision_score
+    average_precision_score,
 )
+
 warnings.filterwarnings("ignore")
 
 
@@ -52,7 +40,7 @@ def save_model(
     feature_validation_dict=None,
     save=0,
     dir_results_files="results_files",
-    dir_models="models"
+    dir_models="models",
 ):
     """
     tipo_model: 1 = Clasificacion
@@ -64,7 +52,7 @@ def save_model(
         metrics_extras = dict()
     if stats_extras is None:
         stats_extras = dict()
-    fs = s3fs.S3FileSystem()
+
     today = (
         str(datetime.datetime.now().day)
         + "-"
@@ -83,11 +71,9 @@ def save_model(
         return (
             f"{dt.year:02d}"
             f"{dt.month:02d}"
-            f"{dt.day:02d}"
-            + f"{dt.hour:02d}"
-            + f"{dt.minute:02d}"
-            + f"{dt.second:02d}"
+            f"{dt.day:02d}" + f"{dt.hour:02d}" + f"{dt.minute:02d}" + f"{dt.second:02d}"
         )
+
     # Generamos el id del modelo
     model_id = unique_id()
     # Parametros del modelo
@@ -174,9 +160,7 @@ def save_model(
     # Features de la data de train
     train = pd.concat([X_train, y_train], axis=1)
     # ^ ES IMPORTANTE que el target este de ultimo!
-    df_feats = pd.DataFrame(
-        train.columns, columns=[user_name + "-" + model_id]
-    ).T
+    df_feats = pd.DataFrame(train.columns, columns=[user_name + "-" + model_id]).T
     df_feats.columns = [i for i, c in enumerate(df_feats.columns)]
     # Mean de cada feature
     train = pd.concat([X_train, y_train], axis=1)
@@ -186,23 +170,15 @@ def save_model(
     # target_enc_model y dicc_models_predict_nans
     if target_enc_model:
         target_enc_model_dir = (
-            f"{dir_models}/target_enc_model_"
-            + user_name
-            + "-"
-            + model_id
-            + ".pkl"
+            f"{dir_models}/target_enc_model_" + user_name + "-" + model_id + ".pkl"
         )
-        with fs.open(target_enc_model_dir, "wb") as file:
+        with open(target_enc_model_dir, "wb") as file:
             pickle.dump(target_enc_model, file)
     if dicc_models_predict_nans:
         dicc_models_predict_nans_dir = (
-            f"{dir_models}/dicc_predict_nans_"
-            + user_name
-            + "-"
-            + model_id
-            + ".pkl"
+            f"{dir_models}/dicc_predict_nans_" + user_name + "-" + model_id + ".pkl"
         )
-        with fs.open(dicc_models_predict_nans_dir, "wb") as file:
+        with open(dicc_models_predict_nans_dir, "wb") as file:
             pickle.dump(dicc_models_predict_nans, file)
     if feature_validation_dict:
         feature_validation_dict_dir = (
@@ -212,13 +188,11 @@ def save_model(
             + model_id
             + ".pkl"
         )
-        with fs.open(feature_validation_dict_dir, "wb") as file:
+        with open(feature_validation_dict_dir, "wb") as file:
             pickle.dump(feature_validation_dict, file)
     if save:
         # Guardamos el modelo en la carpeta de models
-        Pkl_Filename = (
-            f"{dir_models}/model_" + user_name + "-" + model_id + ".pkl"
-        )
+        Pkl_Filename = f"{dir_models}/model_" + user_name + "-" + model_id + ".pkl"
         if dir_results_files.startswith("s3"):
             with fs.open(Pkl_Filename, "wb") as file:
                 pickle.dump(model, file)
@@ -239,12 +213,12 @@ def save_model(
             index_label="Model",
         )
         df_feats.to_csv(
-            f"{dir_results_files}/features_train_{user_name}-{model_id}.csv",
+            f"{dir_results_files}/features_train_cols_{user_name}-{model_id}.csv",
             index_label="Model",
         )
+
         df_feats_train_mean.to_csv(
-            f"{dir_results_files}/features_train_mean_"
-            + f"{user_name}-{model_id}.csv",
+            f"{dir_results_files}/features_train_mean_" + f"{user_name}-{model_id}.csv",
             index_label="Model",
         )
         print("Modelo, parametros, metricas y stats guardados exitosamente")
@@ -252,23 +226,20 @@ def save_model(
 
 class ClassModelResults:
     def __init__(self, last_results=0, df_results=None):
-        fs = s3fs.S3FileSystem()
-        self.fs = fs
         self.last_results = last_results
         self.df_results = {}
         self.df_results["params"] = pd.DataFrame()
         self.df_results["metrics"] = pd.DataFrame()
         self.df_results["stats"] = pd.DataFrame()
-        self.df_results["features_train"] = pd.DataFrame()
+        self.df_results["features_train_cols"] = pd.DataFrame()
         self.df_results["features_train_mean"] = pd.DataFrame()
 
     def get_model_results(self, dir_results_files="results_files", only_last_files=0):
-        fs = s3fs.S3FileSystem()
         tipo_file = [
             "params",
             "metrics",
             "stats",
-            "features_train",
+            "features_train_cols",
             "features_train_mean",
         ]
         df_results = {}
@@ -280,24 +251,24 @@ class ClassModelResults:
                 results_files = os.listdir(f"{dir_results_files}/")
                 if len(results_files) == 0:
                     os_walk = os.walk(f"{dir_results_files}/", topdown=False)
-                    results_files = [[n for n in fls] for _, _, fls in os_walk][
-                        0
-                    ]
+                    results_files = [[n for n in fls] for _, _, fls in os_walk][0]
             wanted_files = [f for f in results_files if f.startswith(t)]
-            # ESTO ES PARA SOLO OBTENER LOS ULTIMOS X FILES
+            #### ESTO ES PARA SOLO OBTENER LOS ULTIMOS X FILES
             if only_last_files > 0:
+
                 def get_date_from_id(unique_id):
                     return f"{unique_id[:4]}-{unique_id[4:6]}-{unique_id[6:8]} {unique_id[8:10]}:{unique_id[10:12]}:{unique_id[12:14]}"
-                id_wanted_files = [f.split('-')[-1].split('.')[0]
-                                   for f in wanted_files]
-                # Para todos los files antes de este fix
+
+                id_wanted_files = [f.split("-")[-1].split(".")[0] for f in wanted_files]
+                ## Para todos los files antes de este fix
                 for i, f in enumerate(id_wanted_files):
                     if len(f) != 14:
-                        id_wanted_files[i] = "202208"+f
-                date_wanted_files = [get_date_from_id(
-                    v) for v in id_wanted_files]
-                date_wanted_files = [datetime.datetime.strptime(
-                    v, '%Y-%m-%d %H:%M:%S') for v in date_wanted_files]
+                        id_wanted_files[i] = "202208" + f
+                date_wanted_files = [get_date_from_id(v) for v in id_wanted_files]
+                date_wanted_files = [
+                    datetime.datetime.strptime(v, "%Y-%m-%d %H:%M:%S")
+                    for v in date_wanted_files
+                ]
                 date_wanted_files_sort = list(np.argsort(date_wanted_files))
                 date_wanted_files_sort.reverse()
                 wanted_files = np.array(wanted_files)[date_wanted_files_sort]
@@ -312,9 +283,7 @@ class ClassModelResults:
                 # falta quitar los que comienzan con features_train porque no estaran en
                 # el listado
                 not_wanted_files += [
-                    f
-                    for f in wanted_files
-                    if (f.startswith(tf)) & (len(tf) > len(t))
+                    f for f in wanted_files if (f.startswith(tf)) & (len(tf) > len(t))
                 ]
             wanted_files = list(set(wanted_files) - set(not_wanted_files))
             dfs = []
@@ -338,17 +307,6 @@ class ClassModelResults:
             )
         return self.df_results
 
-    def load_model(self, model_id, dir_models="models"):
-        if dir_models.startswith("s3"):
-            with self.fs.open(
-                f"{dir_models}/model_{model_id}.pkl", "rb"
-            ) as input_file:
-                model_loaded = pickle.load(input_file)
-        else:
-            with open(f"{dir_models}/model_{model_id}.pkl", "rb") as input_file:
-                model_loaded = pickle.load(input_file)
-        return model_loaded
-
     def load_best_model(
         self,
         metrica="F1_score",
@@ -370,67 +328,62 @@ class ClassModelResults:
         best_model_idx = df_metrics[metrica].idxmax()
         best_model_name = df_metrics.loc[best_model_idx].name
         # print(best_model_name)
-        best_model = self.load_model(best_model_name, dir_models)
+        best_model = load_model(best_model_name, dir_models)
         return best_model
 
 
-def file_exists_s3(path_to_file):
-    fs = s3fs.S3FileSystem()
+def file_exists_custom(path_to_file):
     try:
-        fs.open(path_to_file)
+        open(path_to_file)
         return True
     except BaseException:
         return False
 
 
 def load_model(chosen_model_name, dir_models):
-    fs = s3fs.S3FileSystem()
     dict_results = {}
     # dicc_predict_nans
     path_to_file = f"{dir_models}/dicc_predict_nans_{chosen_model_name}.pkl"
-    if file_exists_s3(path_to_file):
-        with fs.open(path_to_file, "rb") as input_file:
+    if file_exists_custom(path_to_file):
+        with open(path_to_file, "rb") as input_file:
             dicc_predict_nans = pickle.load(input_file)
         dict_results["dicc_predict_nans"] = dicc_predict_nans
     # target_enc_model
     path_to_file = f"{dir_models}/target_enc_model_{chosen_model_name}.pkl"
-    if file_exists_s3(path_to_file):
-        with fs.open(path_to_file, "rb") as input_file:
+    if file_exists_custom(path_to_file):
+        with open(path_to_file, "rb") as input_file:
             target_enc_model = pickle.load(input_file)
         dict_results["target_enc_model"] = target_enc_model
     # chosen_model
-    with fs.open(
-        f"{dir_models}/model_{chosen_model_name}.pkl", "rb"
-    ) as input_file:
+    with open(f"{dir_models}/model_{chosen_model_name}.pkl", "rb") as input_file:
         chosen_model = pickle.load(input_file)
     dict_results["chosen_model"] = chosen_model
     return dict_results
 
 
 def export_model(chosen_model_name, dir_models, dir_export):
-    fs = s3fs.S3FileSystem()
     dict_results = {}
     # dicc_predict_nans
     path_to_file = f"{dir_models}/dicc_predict_nans_{chosen_model_name}.pkl"
-    filehandler = fs.open(path_to_file, "rb")
+    filehandler = open(path_to_file, "rb")
     file_obj = pickle.load(filehandler)
-    filename = path_to_file.split('/')[-1]
-    dir_export_file = dir_export+f'/{filename}'
+    filename = path_to_file.split("/")[-1]
+    dir_export_file = dir_export + f"/{filename}"
     filehandler2 = open(dir_export_file, "wb")
     pickle.dump(file_obj, filehandler2)
     # target_enc_model_
     path_to_file = f"{dir_models}/target_enc_model_{chosen_model_name}.pkl"
-    filehandler = fs.open(path_to_file, "rb")
+    filehandler = open(path_to_file, "rb")
     file_obj = pickle.load(filehandler)
-    filename = path_to_file.split('/')[-1]
-    dir_export_file = dir_export+f'/{filename}'
+    filename = path_to_file.split("/")[-1]
+    dir_export_file = dir_export + f"/{filename}"
     filehandler2 = open(dir_export_file, "wb")
     pickle.dump(file_obj, filehandler2)
     # model_
     path_to_file = f"{dir_models}/model_{chosen_model_name}.pkl"
-    filehandler = fs.open(path_to_file, "rb")
+    filehandler = open(path_to_file, "rb")
     file_obj = pickle.load(filehandler)
-    filename = path_to_file.split('/')[-1]
-    dir_export_file = dir_export+f'/{filename}'
+    filename = path_to_file.split("/")[-1]
+    dir_export_file = dir_export + f"/{filename}"
     filehandler2 = open(dir_export_file, "wb")
     pickle.dump(file_obj, filehandler2)
